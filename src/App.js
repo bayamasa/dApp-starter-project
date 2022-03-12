@@ -15,72 +15,65 @@ const App = () => {
   const [allWaves, setAllWaves] = useState([]);
   console.log("currentAccount: ", currentAccount);
   /* デプロイされたコントラクトのアドレスを保持する変数を作成 */
-  const contractAddress = "0x8B1D31bFBf34dBF12c73034215752261e55b443c";
+  const contractAddress = "0x930d6ea1B1a1A4cCE6Fa279d0E8AE4edce7d6Adc";
   /* コントラクトからすべてのwavesを取得するメソッドを作成 */
   /* ABIの内容を参照する変数を作成 */
   const contractABI = abi.abi;
 
-  const getAllWaves = async () => {
-    const { ethereum } = window;
-
-    try {
-      if (ethereum) {
-        const provider = new ethers.providers.Web3Provider(ethereum);
-        const signer = provider.getSigner();
-        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
-        /* コントラクトからgetAllWavesメソッドを呼び出す */
-        const waves = await wavePortalContract.getAllWaves();
-        /* UIに必要なのは、アドレス、タイムスタンプ、メッセージだけなので、以下のように設定 */
-        const wavesCleaned = waves.map(wave => {
-          return {
-            address: wave.waver,
-            timestamp: new Date(wave.timestamp * 1000),
-            message: wave.message,
-          };
-        });
-        /* React Stateにデータを格納する */
-        setAllWaves(wavesCleaned);
-      } else {
-        console.log("Ethereum object doesn't exist!");
-      }
-    } catch (error) {
-      console.log(error);
-    }
-    };
-
-    /**
-     * `emit`されたイベントをフロントエンドに反映させる
-     */
-    useEffect(() => {
-    let wavePortalContract;
-
-    const onNewWave = (from, timestamp, message) => {
-      console.log("NewWave", from, timestamp, message);
-      setAllWaves(prevState => [
-      ...prevState,
-      {
-        address: from,
-        timestamp: new Date(timestamp * 1000),
-        message: message,
-      },
-      ]);
-    };
-    /* NewWaveイベントがコントラクトから発信されたときに、情報をを受け取ります */
-    if (window.ethereum) {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-
-      wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
-      wavePortalContract.on("NewWave", onNewWave);
-    }
-    /*メモリリークを防ぐために、NewWaveのイベントを解除します*/
-    return () => {
-      if (wavePortalContract) {
-      wavePortalContract.off("NewWave", onNewWave);
-      }
-    };
-    }, []);
-
+	const getAllWaves = async () => {
+		const { ethereum } = window;
+		try {
+			if (ethereum) {
+				const provider = new ethers.providers.Web3Provider(ethers)
+				const signer = provider.getSigner();
+				const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+				const waves = await wavePortalContract.getAllWaves();
+				
+				const wavesCleaned = waves.map(wave => {
+					return {
+						address: wave.waver,
+						timestamp: new Date(wave.timestamp * 1000),
+						message: wave.message,
+					};
+				})
+				
+				setAllWaves(wavesCleaned);
+			} else {
+				console.log("Ethereum object doesn't exist!");
+			}
+		} catch (error) {
+			console.log(error);
+		}
+	}
+	
+	useEffect(() => {
+		let wavePortalContract;
+		
+		const onNewWave = (from, timestamp, message) => {
+			console.log("NewWave", from, timestamp, message);
+			setAllWaves(prevState => [
+				...prevState,
+				{
+					address:from,
+					timestamp: new Date(timestamp * 1000),
+					message: message,
+				}
+			])
+		}
+		
+		if (window.ethereum) {
+			const provider = new ethers.providers.Web3Provider(window.ethereum);
+			const signer = provider.getSigner();
+			
+			wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+			wavePortalContract.on("NewWave", onNewWave);
+		}
+		return () => {
+			if (wavePortalContract) {
+				wavePortalContract.off("NewWave", onNewWave);
+			}
+		}
+	}, [])
   /* window.ethereumにアクセスできることを確認 */
   const checkIfWalletIsConnected = async () => {
     try {
@@ -131,6 +124,14 @@ const App = () => {
         const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
         let count = await wavePortalContract.getTotalWaves();
         console.log("Retrieved total wave count...", count.toNumber());
+		
+		let contractBalance = await provider.getBalance(
+			wavePortalContract.address
+		);
+		console.log(
+			"Contract balance:",
+			ethers.utils.formatEther(contractBalance)
+		)
         /* コントラクトに👋（wave）を書き込む */
         const waveTxn = await wavePortalContract.wave(messageValue,{gasLimit:300000})
         console.log("Mining...", waveTxn.hash);
@@ -138,6 +139,16 @@ const App = () => {
         console.log("Mined -- ", waveTxn.hash);
         count = await wavePortalContract.getTotalWaves();
         console.log("Retrieved total wave count...", count.toNumber());
+		let contractBalance_post = await provider.getBalance(wavePortalContract.address);
+		if (contractBalance_post < contractBalance){
+			console.log("User won")
+		} else {
+			console.log("User didn't win ETH.")
+		}
+		console.log(
+			"Contract balance after wave:",
+			ethers.utils.formatEther(contractBalance_post)
+		)
       } else {
         console.log("Ethereum object doesn't exist!");
       }
